@@ -3,6 +3,8 @@ use std::char;
 use std::u32;
 use std::error;
 use std::fmt;
+use std::iter::Step;
+use std::num::One;
 use std::ops::{Range, Index};
 
 const OPEN_CHAR:    char = '[';
@@ -14,6 +16,9 @@ const CONTROL_CHARS: [char; 4] = [OPEN_CHAR, CLOSE_CHAR, DIVIDER_CHAR, ESCAPE_CH
 const NULL_ESCAPE_CHAR:    char = '0';
 const BYTE_ESCAPE_CHAR:    char = 'x';
 const UNICODE_ESCAPE_CHAR: char = 'u';
+const LINE_FEED_ESCAPE_CHAR: char = 'n';
+const CARRIAGE_RETURN_ESCAPE_CHAR: char = 'r';
+const HORIZONTAL_TAB_ESCAPE_CHAR: char = 't';
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Token<S> {
@@ -191,7 +196,7 @@ enum PartialRange<Idx> {
     Full(Range<Idx>),
 }
 
-impl <'a, Idx: Clone, In: 'a + ?Sized + Index<Range<Idx>, Output=str>, It: Iterator<Item = (Idx, char)>> CharReader<&'a str, NoError> for StrIndexCharReader<'a, In, It> {
+impl <'a, Idx: Clone+Step+One, In: 'a + ?Sized + Index<Range<Idx>, Output=str>, It: Iterator<Item = (Idx, char)>> CharReader<&'a str, NoError> for StrIndexCharReader<'a, In, It> {
     type State = Idx;
     type Accumulator = StrIndexCharAccumulator<'a, In, Idx>;
 
@@ -213,16 +218,16 @@ impl <'a, Idx: Clone, In: 'a + ?Sized + Index<Range<Idx>, Output=str>, It: Itera
         };
     }
     fn accumulate(a: Self::Accumulator) -> &'a str {
-        let rg = match a.idx {
+        let (start, end) = match a.idx {
             PartialRange::None => return "",
             PartialRange::Start(idx) => {
-                let end = idx.clone();
-                Range{start: idx, end: end}
+                let end = idx.step(&One::one()).unwrap_or_else(||idx.clone());
+                (idx, end)
             },
-            PartialRange::Full(rg) => rg,
+            PartialRange::Full(rg) => (rg.start, rg.end.step(&One::one()).unwrap_or(rg.end)),
         };
 
-        &a.i[rg]
+        &a.i[Range{start: start, end: end}]
     }
 }
 
@@ -291,6 +296,9 @@ impl <S, E: error::Error, C: CharReader<S, E>> Tokenizer<S, E, C> {
             (CLOSE_CHAR, _) => Ok(Token::Escape(CLOSE_CHAR)),
             (DIVIDER_CHAR, _) => Ok(Token::Escape(DIVIDER_CHAR)),
             (ESCAPE_CHAR, _) => Ok(Token::Escape(ESCAPE_CHAR)),
+            (LINE_FEED_ESCAPE_CHAR, _) => Ok(Token::Escape('\n')),
+            (CARRIAGE_RETURN_ESCAPE_CHAR, _) => Ok(Token::Escape('\r')),
+            (HORIZONTAL_TAB_ESCAPE_CHAR, _) => Ok(Token::Escape('\t')),
             (NULL_ESCAPE_CHAR, _) => Ok(Token::Null),
             (BYTE_ESCAPE_CHAR, _) => {
                 let c1 = match self.reader.next() {
@@ -413,21 +421,21 @@ d888888b d88888b .d8888. d888888b
 
 #[cfg(test)]
 mod test {
+    use std::fmt::Debug;
     use std::error;
     use std::str::{Chars, CharIndices};
     use tokenizer::{Token, Error, Tokenizer, NoError, StringCharReader, StrIndexCharReader};
 
-    fn test_tokenizer<S, E, I, J, F> (mut a: I, mut b: J, f: F)
-    where S: PartialEq, E: error::Error,
+    fn test_tokenizer<S, E, I, J> (mut a: I, mut b: J)
+    where S: PartialEq+Debug, E: error::Error,
     I: Iterator<Item = Result<Token<S>, Error<E>>>,
-    J: Iterator<Item = Result<Token<S>, Error<E>>>,
-    F: Fn(&Token<S>, &Token<S>) -> bool, {
+    J: Iterator<Item = Result<Token<S>, Error<E>>>, {
         for i in a.by_ref().zip(b.by_ref()) {
             match i {
                 (Err(a), Err(b)) => assert_eq!(a, b),
                 (Err(_), Ok(_)) => assert!(false),
                 (Ok(_), Err(_)) => assert!(false),
-                (Ok(a), Ok(b)) => assert!(!f(&a, &b)),
+                (Ok(a), Ok(b)) => assert_eq!(a, b),
             }
         }
         assert!(a.next().is_none());
@@ -444,13 +452,206 @@ mod test {
 
     #[test]
     fn test_tokenizer_empty() {
-        test_tokenizer(new_tokenizer_1(""), vec![].into_iter(), Token::eq);
-        test_tokenizer(new_tokenizer_2(""), vec![].into_iter(), Token::eq);
+        test_tokenizer(new_tokenizer_1(""), vec![].into_iter());
+        test_tokenizer(new_tokenizer_2(""), vec![].into_iter());
     }
 
     #[test]
     fn test_tokenizer_simple() {
-        //test_tokenizer(new_tokenizer_1("a"), vec![Ok(Token::Text("a".to_string()))].into_iter(), Token::eq);
-        test_tokenizer(new_tokenizer_2("a"), vec![Ok(Token::Text("a"))].into_iter(), Token::eq);
+        test_tokenizer(new_tokenizer_1("a"), vec![Ok(Token::Text("a".to_string()))].into_iter());
+        test_tokenizer(new_tokenizer_1("a b c"), vec![Ok(Token::Text("a b c".to_string()))].into_iter());
+        test_tokenizer(new_tokenizer_1("[["), vec![Ok(Token::Open), Ok(Token::Open)].into_iter());
+        test_tokenizer(new_tokenizer_1("|[]|"), vec![Ok(Token::Comment("".to_string()))].into_iter());
+        test_tokenizer(new_tokenizer_1("[hello"), vec![Ok(Token::Open), Ok(Token::Text("hello".to_string()))].into_iter());
+        test_tokenizer(new_tokenizer_1("[ ]"), vec![Ok(Token::Open), Ok(Token::Whitespace(" ".to_string())), Ok(Token::Close)].into_iter());
+        test_tokenizer(new_tokenizer_1("[a b c|1 2 3]"), vec![Ok(Token::Open), Ok(Token::Text("a b c".to_string())), Ok(Token::Divider), Ok(Token::Text("1 2 3".to_string())), Ok(Token::Close)].into_iter());
+
+        test_tokenizer(new_tokenizer_2("a"), vec![Ok(Token::Text("a"))].into_iter());
+        test_tokenizer(new_tokenizer_2("a b c"), vec![Ok(Token::Text("a b c"))].into_iter());
+        test_tokenizer(new_tokenizer_2("[["), vec![Ok(Token::Open), Ok(Token::Open)].into_iter());
+        test_tokenizer(new_tokenizer_2("|[]|"), vec![Ok(Token::Comment(""))].into_iter());
+        test_tokenizer(new_tokenizer_2("[hello"), vec![Ok(Token::Open), Ok(Token::Text("hello"))].into_iter());
+        test_tokenizer(new_tokenizer_2("[ ]"), vec![Ok(Token::Open), Ok(Token::Whitespace(" ")), Ok(Token::Close)].into_iter());
+        test_tokenizer(new_tokenizer_2("[a b c|1 2 3]"), vec![Ok(Token::Open), Ok(Token::Text("a b c")), Ok(Token::Divider), Ok(Token::Text("1 2 3")), Ok(Token::Close)].into_iter());
+    }
+
+    #[test]
+    fn test_tokenizer_escape() {
+        test_tokenizer(new_tokenizer_1(r"\["), vec![Ok(Token::Escape('['))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\]"), vec![Ok(Token::Escape(']'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\|"), vec![Ok(Token::Escape('|'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\\"), vec![Ok(Token::Escape('\\'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\"), vec![Err(Error::UnexpectedEOF)].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\n"), vec![Ok(Token::Escape('\n'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\r"), vec![Ok(Token::Escape('\r'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\t"), vec![Ok(Token::Escape('\t'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\q"), vec![Err(Error::UnknownEscapeSequence('q'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\0"), vec![Ok(Token::Null)].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\x64"), vec![Ok(Token::Escape('\x64'))].into_iter());
+        test_tokenizer(new_tokenizer_1(r"\u[64]"), vec![Ok(Token::Escape('\u{64}'))].into_iter());
+
+        test_tokenizer(new_tokenizer_2(r"\["), vec![Ok(Token::Escape('['))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\]"), vec![Ok(Token::Escape(']'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\|"), vec![Ok(Token::Escape('|'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\\"), vec![Ok(Token::Escape('\\'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\"), vec![Err(Error::UnexpectedEOF)].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\n"), vec![Ok(Token::Escape('\n'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\r"), vec![Ok(Token::Escape('\r'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\t"), vec![Ok(Token::Escape('\t'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\q"), vec![Err(Error::UnknownEscapeSequence('q'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\0"), vec![Ok(Token::Null)].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\x64"), vec![Ok(Token::Escape('\x64'))].into_iter());
+        test_tokenizer(new_tokenizer_2(r"\u[64]"), vec![Ok(Token::Escape('\u{64}'))].into_iter());
+    }
+
+    #[test]
+    fn test_tokenizer_complex() {
+        test_tokenizer(new_tokenizer_1(
+            r"[ [a|] |[this is a comment]|
+b c |
+ 1 2 3 ]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Whitespace(" ".to_string())),
+                Ok(Token::Open),
+                Ok(Token::Text("a".to_string())),
+                Ok(Token::Divider),
+                Ok(Token::Close),
+                Ok(Token::Whitespace(" ".to_string())),
+                Ok(Token::Comment("this is a comment".to_string())),
+                Ok(Token::Text("\nb c ".to_string())),
+                Ok(Token::Divider),
+                Ok(Token::Text("\n 1 2 3 ".to_string())),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_1("[| [| [| [| [|!@#]]]]]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ".to_string())),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ".to_string())),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ".to_string())),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ".to_string())),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Text("!@#".to_string())),
+                Ok(Token::Close),
+                Ok(Token::Close),
+                Ok(Token::Close),
+                Ok(Token::Close),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_1(r"[|right\[ stuff]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Text("right".to_string())),
+                Ok(Token::Escape('[')),
+                Ok(Token::Text(" stuff".to_string())),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_1(r"[left stuff|]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Text("left stuff".to_string())),
+                Ok(Token::Divider),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_1(r"[FirstElement|\0]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Text("FirstElement".to_string())),
+                Ok(Token::Divider),
+                Ok(Token::Null),
+            ].into_iter(),
+        );
+
+        test_tokenizer(new_tokenizer_2(
+            r"[ [a|] |[this is a comment]|
+b c |
+ 1 2 3 ]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Whitespace(" ")),
+                Ok(Token::Open),
+                Ok(Token::Text("a")),
+                Ok(Token::Divider),
+                Ok(Token::Close),
+                Ok(Token::Whitespace(" ")),
+                Ok(Token::Comment("this is a comment")),
+                Ok(Token::Text("\nb c ")),
+                Ok(Token::Divider),
+                Ok(Token::Text("\n 1 2 3 ")),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_2("[| [| [| [| [|!@#]]]]]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ")),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ")),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ")),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Whitespace(" ")),
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Text("!@#")),
+                Ok(Token::Close),
+                Ok(Token::Close),
+                Ok(Token::Close),
+                Ok(Token::Close),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_2(r"[|right\[ stuff]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Divider),
+                Ok(Token::Text("right")),
+                Ok(Token::Escape('[')),
+                Ok(Token::Text(" stuff")),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_2(r"[left stuff|]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Text("left stuff")),
+                Ok(Token::Divider),
+                Ok(Token::Close),
+            ].into_iter(),
+        );
+        test_tokenizer(
+            new_tokenizer_2(r"[FirstElement|\0]"),
+            vec![
+                Ok(Token::Open),
+                Ok(Token::Text("FirstElement")),
+                Ok(Token::Divider),
+                Ok(Token::Null),
+            ].into_iter(),
+        );
     }
 }
