@@ -187,32 +187,32 @@ To start, let's define our character sets: Control Characters, Comment Character
 
 Control Characters are the characters reserved for use by the syntax and are used to define the document structure. They are `[`, `]`, `|`, `\`, and `#`.
 
-|                   | |                                                                                                       |
-|-------------------|-|-------------------------------------------------------------------------------------------------------|
-| Control Character |=| Open Token &#124; Close Token &#124; Divider Token &#124; Escape Character &#124; Comment Character ; |
-| Open Token        |=| "[" ;                                                                                                 |
-| Close Token       |=| "]" ;                                                                                                 |
-| Divider Token     |=| "&#124;" ;                                                                                            |
-| Escape Character  |=| "\\" ;                                                                                                |
-| Comment Character |=| "#" ;                                                                                                 |
+|                   |   |                                                                                                       |
+|-------------------|---|-------------------------------------------------------------------------------------------------------|
+| Control Character | = | Open Token &#124; Close Token &#124; Divider Token &#124; Escape Character &#124; Comment Character ; |
+| Open Token        | = | "[" ;                                                                                                 |
+| Close Token       | = | "]" ;                                                                                                 |
+| Divider Token     | = | "&#124;" ;                                                                                            |
+| Escape Character  | = | "\\" ;                                                                                                |
+| Comment Character | = | "#" ;                                                                                                 |
 
 ##### Comment Character
 Comment Characters are used by the syntax of comments.
 
-|                                 | |                                                                           |
-|---------------------------------|-|---------------------------------------------------------------------------|
-| Line Feed Character             |=| ? Unicode code point U+000A ? ;                                           |
-| Line Comment Character          |=| ? a Unicode code point ? - Line Feed Character ;                          |
-| Line Comment Starting Character |=| Line Comment Character - Open Token ;                                     |
-| Block Comment Character         |=| ? a Unicode code point ? - Comment Character - Open Token - Close Token ; |
+|                                 |   |                                                                           |
+|---------------------------------|---|---------------------------------------------------------------------------|
+| Line Feed Character             | = | ? Unicode code point U+000A ? ;                                           |
+| Line Comment Character          | = | ? a Unicode code point ? - Line Feed Character ;                          |
+| Line Comment Starting Character | = | Line Comment Character - Open Token ;                                     |
+| Block Comment Character         | = | ? a Unicode code point ? - Comment Character - Open Token - Close Token ; |
 
 ##### Whitespace Characters
 
 Whitespace Characters are characters which can be used in some circumstances to make the document more readable without changing it's meaning. They are defined by the [Unicode WSpace property](http://unicode.org/cldr/utility/list-unicodeset.jsp?a=[:whitespace:]).
 
-|                      | |                                                             |
-|----------------------|-|-------------------------------------------------------------|
-| Whitespace Character |=| ? a Unicode code point with character property WSpace=Y ? ; |
+|                      |   |                                                             |
+|----------------------|---|-------------------------------------------------------------|
+| Whitespace Character | = | ? a Unicode code point with character property WSpace=Y ? ; |
 
 ##### Text Characters
 
@@ -220,19 +220,19 @@ Text Characters are the characters allowed for document content. The set of Text
 
 Hex characters are characters used to encode hexadecimal values for escape sequences.
 
-|                | |                                                                                                                                                                                                                                              |
-|----------------|-|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Text Character |=| ? a Unicode code point ? - Control Character - Whitespace Character ;                                                                                                                                                                        |
-| Hex Character  |=| "0" &#124; "1" &#124; "2" &#124; "3" &#124; "4" &#124; "5" &#124; "6" &#124; "7" &#124; "8" &#124; "9" &#124; "a" &#124; "b" &#124; "c" &#124; "d" &#124; "e" &#124; "f" &#124; "A" &#124; "B" &#124; "C" &#124; "D" &#124; "E" &#124; "F" ; |
+|                |   |                                                                                                                                                                                                                                              |
+|----------------|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Text Character | = | ? a Unicode code point ? - Control Character - Whitespace Character ;                                                                                                                                                                        |
+| Hex Character  | = | "0" &#124; "1" &#124; "2" &#124; "3" &#124; "4" &#124; "5" &#124; "6" &#124; "7" &#124; "8" &#124; "9" &#124; "a" &#124; "b" &#124; "c" &#124; "d" &#124; "e" &#124; "f" &#124; "A" &#124; "B" &#124; "C" &#124; "D" &#124; "E" &#124; "F" ; |
 
 ##### Special Characters
 
 Special Characters are characters which are used to create Monads of special meaning. The only special character at present is `0`. `0` is meant to signify a null value.
 
-|                   | |        |
-|-------------------|-|--------|
-| Special Character |=| Null ; |
-| Null              |=| "0" ;  |
+|                   |   |        |
+|-------------------|---|--------|
+| Special Character | = | Null ; |
+| Null              | = | "0" ;  |
 
 #### Token
 
@@ -242,26 +242,26 @@ Using the character sets we defined, we next define some Tokens: Comment Token, 
 
 Comment Tokens come in two forms, Line Comments and Block Comments. Comments do not have a value and are ignored.
 
-|               | |                                     |
-|---------------|-|-------------------------------------|
-| Comment Token |=| Line Comment &#124; Block Comment ; |
+|               |   |                                     |
+|---------------|---|-------------------------------------|
+| Comment Token | = | Line Comment &#124; Block Comment ; |
 
 Line Comments begin with a Comment Character followed by anything but an Open Token. Line Comments end with a Line Feed Character.
 
-|              | |                                                                                                           |
-|--------------|-|-----------------------------------------------------------------------------------------------------------|
-| Line Comment |=| Comment Character, [ Line Comment Starting Character, { Line Comment Character } ], Line Feed Character ; |
+|              |   |                                                                                                           |
+|--------------|---|-----------------------------------------------------------------------------------------------------------|
+| Line Comment | = | Comment Character, [ Line Comment Starting Character, { Line Comment Character } ], Line Feed Character ; |
 
 Block Comments begin with a Comment Character followed by an Open Token. Block Comments end with a Close Token Followed by a Comment Character. Block Comments can be nested.
 
-|                       | |                                                                                                                            |
-|-----------------------|-|----------------------------------------------------------------------------------------------------------------------------|
-| Block Comment         |=| Comment Character, Open Token, Block Comment Content, Close Token, Comment Character ;                                     |
-| Block Comment Content |=| [ Block Comment ], [ Block Comment Text ], { Block Comment, [ Block Comment Text ] } ;                                     |
-| Block Comment Text    |=| Block Comment Helper &#124; Block Comment Closed &#124; Block Comment Open ;                                               |
-| Block Comment Open    |=| Comment Character, [ Block Comment Helper &#124; Block Comment Open ] ;                                                    |
-| Block Comment Closed  |=| Open Token, [ Block Comment Text ] ;                                                                                       |
-| Block Comment Helper  |=| Block Comment Character, [ Block Comment Text ] &#124; Close Token, [ Block Comment Helper &#124; Block Comment Closed ] ; |
+|                       |   |                                                                                                                            |
+|-----------------------|---|----------------------------------------------------------------------------------------------------------------------------|
+| Block Comment         | = | Comment Character, Open Token, Block Comment Content, Close Token, Comment Character ;                                     |
+| Block Comment Content | = | [ Block Comment ], [ Block Comment Text ], { Block Comment, [ Block Comment Text ] } ;                                     |
+| Block Comment Text    | = | Block Comment Helper &#124; Block Comment Closed &#124; Block Comment Open ;                                               |
+| Block Comment Open    | = | Comment Character, [ Block Comment Helper &#124; Block Comment Open ] ;                                                    |
+| Block Comment Closed  | = | Open Token, [ Block Comment Text ] ;                                                                                       |
+| Block Comment Helper  | = | Block Comment Character, [ Block Comment Text ] &#124; Close Token, [ Block Comment Helper &#124; Block Comment Closed ] ; |
 
 ##### Escape Token
 
@@ -273,35 +273,35 @@ Escape Tokens are a way of encoding any Unicode code point within a document. Es
 * A Hex Sequence, the value is a single code point corresponding to the 8-bit character code represented by the Hex Characters.
 * A Unicode Sequence, the value is a single code point corresponding to the 24-bit Unicode character code represented by the Hex Character(s).
 
-|                  | |                                                                                                                        |
-|------------------|-|------------------------------------------------------------------------------------------------------------------------|
-| Escape Token     |=| Escape Character, ( Control Character &#124; "n" &#124; "r" &#124; "t" &#124; Hex Sequence &#124; Unicode Sequence ) ; |
-| Hex Sequence     |=| "x", Hex Character, Hex Character ;                                                                                    |
-| Unicode Sequence |=| "u", Open Token, Hex Character, 5 * [ Hex Character ], Close Token ;                                                   |
+|                  |   |                                                                                                                        |
+|------------------|---|------------------------------------------------------------------------------------------------------------------------|
+| Escape Token     | = | Escape Character, ( Control Character &#124; "n" &#124; "r" &#124; "t" &#124; Hex Sequence &#124; Unicode Sequence ) ; |
+| Hex Sequence     | = | "x", Hex Character, Hex Character ;                                                                                    |
+| Unicode Sequence | = | "u", Open Token, Hex Character, 5 * [ Hex Character ], Close Token ;                                                   |
 
 ##### Whitespace Token
 
 Whitespace Tokens are composed of a series of one or more Whitespace Characters.
 
-|                  | |                                                  |
-|------------------|-|--------------------------------------------------|
-| Whitespace Token |=| Whitespace Character, { Whitespace Character } ; |
+|                  |   |                                                  |
+|------------------|---|--------------------------------------------------|
+| Whitespace Token | = | Whitespace Character, { Whitespace Character } ; |
 
 ##### Text Token
 
 Text Tokens are composed of a series of 1 or more Text Characters or Whitespace Characters, with at least one Text Character.
 
-|            | |                                                                                            |
-|------------|-|--------------------------------------------------------------------------------------------|
-| Text Token |=| { Whitespace Character }, Text Character, { Whitespace Character &#124; Text Character } ; |
+|            |   |                                                                                            |
+|------------|---|--------------------------------------------------------------------------------------------|
+| Text Token | = | { Whitespace Character }, Text Character, { Whitespace Character &#124; Text Character } ; |
 
 ##### Special Token
 
 Special Tokens are composed of an Escape Character followed by a Special Character.
 
-|               | |                                       |
-|---------------|-|---------------------------------------|
-| Special Token |=| Escape Character, Special Character ; |
+|               |   |                                       |
+|---------------|---|---------------------------------------|
+| Special Token | = | Escape Character, Special Character ; |
 
 #### Document Structure
 
@@ -309,71 +309,71 @@ Special Tokens are composed of an Escape Character followed by a Special Charact
 
 Optional Whitespace is composed of zero or more alternating Whitespace Tokens and runs of Comment Tokens. The value of Optional Whitespace is equivalent to the concatenation of the values of all the Whitespace Tokens that comprise it.
 
-|                     | |                                                                 |
-|---------------------|-|-----------------------------------------------------------------|
-| Optional Whitespace |=| [ Whitespace Token ], { Comment Token, [ Whitespace Token ] } ; |
+|                     |   |                                                                 |
+|---------------------|---|-----------------------------------------------------------------|
+| Optional Whitespace | = | [ Whitespace Token ], { Comment Token, [ Whitespace Token ] } ; |
 
 ##### Text
 
 Basic Text is composed of a sequence of any number of Whitespace, Text Characters, and Escape Sequences, with at least one non-Whitespace element. The value of Basic Text is equivalent to the concatenation of the values of all the Whitespace, Text Characters, and Escape Sequences that comprise it.
 
-|                        | |                                                                                                                                  |
-|------------------------|-|----------------------------------------------------------------------------------------------------------------------------------|
-| Basic Text             |=| { [ Whitespace Token ], Comment Token }, ( Text Sequence &#124; Escape Sequence ) ;                                              |
-| Comment Sequence       |=| Comment Token, [ Comment Sequence &#124; Escape Sequence &#124; Whitespace Sequence &#124; Text Sequence ] ;                     |
-| Escape Sequence        |=| Escape Token, [ Comment Sequence &#124; Escape Sequence &#124; Whitespace Sequence &#124; Text Sequence ] ;                      |
-| Whitespace Sequence    |=| Whitespace Token, [ Comment Sequence &#124; Escape Sequence ] ;                                                                  |
-| Text Sequence          |=| Text Token, [ Comment Sequence &#124; Escape Sequence ] ;                                                                        |
+|                        |   |                                                                                                                                  |
+|------------------------|---|----------------------------------------------------------------------------------------------------------------------------------|
+| Basic Text             | = | { [ Whitespace Token ], Comment Token }, ( Text Sequence &#124; Escape Sequence ) ;                                              |
+| Comment Sequence       | = | Comment Token, [ Comment Sequence &#124; Escape Sequence &#124; Whitespace Sequence &#124; Text Sequence ] ;                     |
+| Escape Sequence        | = | Escape Token, [ Comment Sequence &#124; Escape Sequence &#124; Whitespace Sequence &#124; Text Sequence ] ;                      |
+| Whitespace Sequence    | = | Whitespace Token, [ Comment Sequence &#124; Escape Sequence ] ;                                                                  |
+| Text Sequence          | = | Text Token, [ Comment Sequence &#124; Escape Sequence ] ;                                                                        |
 
 Enclosed Text Sequences are a series of one or more of Enclosed Texts optionally separated by Whitespace. The value of an Enclosed Text Sequence is equivalent to the concatenation of the values of all the Enclosed Texts that comprise it.
 
 Enclosed Text is composed of an Open Token, followed by a Whitespace Token or Text, followed by a Close Token. The value of Enclosed Text is equivalent to the Whitespace or Text component.
 
-|                        | |                                                                                                                                  |
-|------------------------|-|----------------------------------------------------------------------------------------------------------------------------------|
-| Enclosed Text Sequence |=| Enclosed Text, { Optional Whitespace, Enclosed Text } ;                                                                          |
-| Enclosed Text          |=| Open Token, ( Whitespace Token &#124; Text ), Close Token ;                                                                      |
+|                        |   |                                                                                                                                  |
+|------------------------|---|----------------------------------------------------------------------------------------------------------------------------------|
+| Enclosed Text Sequence | = | Enclosed Text, { Optional Whitespace, Enclosed Text } ;                                                                          |
+| Enclosed Text          | = | Open Token, ( Whitespace Token &#124; Text ), Close Token ;                                                                      |
 
 Text is composed of a series of one or more alternating Enclosed Text Sequences and Basic Text. Text may start or end with either of these elements. A series that begins with an Enclosed Text Sequence may optionally be preceded by Whitespace. Similarly, a series that ends with an Enclosed Text Sequence may optionally be followed by Whitespace. The value of Text is equivalent to the concatenation of the values of all the Enclosed Text Sequence and Basic Text that comprise it.
 
-|                        | |                                                                                                                                  |
-|------------------------|-|----------------------------------------------------------------------------------------------------------------------------------|
-| Text                   |=| Leading Basic Text &#124; Leading Enclosed Text ;                                                                                |
-| Leading Basic Text     |=| Basic Text, { Enclosed Text Sequence, Basic Text }, [ Enclosed Text Sequence, Optional Whitespace ] ;                            |
-| Leading Enclosed Text  |=| Optional Whitespace, Enclosed Text Sequence, { Basic Text, Enclosed Text Sequence }, ( Optional Whitespace &#124; Basic Text ) ; |
+|                        |   |                                                                                                                                  |
+|------------------------|---|----------------------------------------------------------------------------------------------------------------------------------|
+| Text                   | = | Leading Basic Text &#124; Leading Enclosed Text ;                                                                                |
+| Leading Basic Text     | = | Basic Text, { Enclosed Text Sequence, Basic Text }, [ Enclosed Text Sequence, Optional Whitespace ] ;                            |
+| Leading Enclosed Text  | = | Optional Whitespace, Enclosed Text Sequence, { Basic Text, Enclosed Text Sequence }, ( Optional Whitespace &#124; Basic Text ) ; |
 
 ##### Tuple
 
 A Tuple falls into one of two distinct types: Monad, and List Tuple.
 
-|                    | |                           |
-|--------------------|-|---------------------------|
-| Tuple              |=| Monad &#124; List Tuple ; |
+|                    |   |                           |
+|--------------------|---|---------------------------|
+| Tuple              | = | Monad &#124; List Tuple ; |
 
 Monads can either be Text Monads, Whitespace Monads, or Special Monads. Text Monads have a value equivalent to the Text that comprise it. Whitespace Monads have a value equivalent to the Optional Whitespace that comprise it. Special Monads have a value based on the significance of the Special Token.
 
-|                    | |                                                           |
-|--------------------|-|-----------------------------------------------------------|
-| Monad              |=| Text Monad &#124; Whitespace Monad &#124; Special Monad ; |
-| Text Monad         |=| Text ;                                                    |
-| Whitespace Monad   |=| Optional Whitespace ;                                     |
-| Special Monad      |=| Optional Whitespace, Special Token, Optional Whitespace ; |
+|                    |   |                                                           |
+|--------------------|---|-----------------------------------------------------------|
+| Monad              | = | Text Monad &#124; Whitespace Monad &#124; Special Monad ; |
+| Text Monad         | = | Text ;                                                    |
+| Whitespace Monad   | = | Optional Whitespace ;                                     |
+| Special Monad      | = | Optional Whitespace, Special Token, Optional Whitespace ; |
 
 List Tuples are composed of Optional Whitespace, followed by an Open Token, followed by either List Elements, a List Tuple, a Special Monad, or nothing, followed by a Close Token, followed by Optional Whitespace.
 
 List Elements are a series of one or more Tuples separated by Divider Tokens, with a trailing Divider Token and Optional Whitespace being optional. Note that Whitespace Monads must be followed by a Divider Token.
 
-|                    | |                                                                                                                                                     |
-|--------------------|-|-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| List Tuple         |=| Optional Whitespace, Open Token, [ List Elements | List Tuple | Special Monad ], Close Token, Optional Whitespace ;                                 |
-| List Elements      |=| Tuple, Divider Token, ( Optional Whitespace &#124; List Element &#124; Whitespace Element ) ;                                                       |
-| List Element       |=| ( Text Monad &#124; Special Monad &#124; List Tuple ), [ Divider Token, ( Optional Whitespace &#124; List Element &#124; Whitespace Element ) ] ) ; |
-| Whitespace Element |=| Whitespace Monad, Divider Token, [ Optional Whitespace &#124; List Element &#124; Whitespace Element ] ;                                            |
+|                    |   |                                                                                                                                                     |
+|--------------------|---|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| List Tuple         | = | Optional Whitespace, Open Token, [ List Elements | List Tuple | Special Monad ], Close Token, Optional Whitespace ;                                 |
+| List Elements      | = | Tuple, Divider Token, ( Optional Whitespace &#124; List Element &#124; Whitespace Element ) ;                                                       |
+| List Element       | = | ( Text Monad &#124; Special Monad &#124; List Tuple ), [ Divider Token, ( Optional Whitespace &#124; List Element &#124; Whitespace Element ) ] ) ; |
+| Whitespace Element | = | Whitespace Monad, Divider Token, [ Optional Whitespace &#124; List Element &#124; Whitespace Element ] ;                                            |
 
 ##### Document
 
 A document is simply comprised of a single Tuple.
 
-|          | |         |
-|----------|-|---------|
-| Document |=| Tuple ; |
+|          |   |         |
+|----------|---|---------|
+| Document | = | Tuple ; |
